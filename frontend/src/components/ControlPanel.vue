@@ -2,10 +2,10 @@
   <div class="control-card">
     <el-form :model="form" inline>
       <el-form-item label="残基数">
-        <el-input-number v-model="form.residues" :min="3" :max="50" />
+        <el-input-number v-model="form.residues" :min="PARAM_RULES.residues.min" :max="PARAM_RULES.residues.max" />
       </el-form-item>
       <el-form-item label="构象数量">
-        <el-input-number v-model="form.conformations" :min="100" :max="5000" :step="100" />
+        <el-input-number v-model="form.conformations" :min="PARAM_RULES.conformations.min" :max="PARAM_RULES.conformations.max" :step="100" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="emitSample" :loading="store.loading">🎲 生成构象采样</el-button>
@@ -26,6 +26,7 @@
 <script setup lang="ts">
 import { reactive, ref } from "vue"
 import { useProteinStore } from "../store/protein"
+import { PARAM_RULES } from "../constants/params"
 const emit = defineEmits<{ sample: [params: { residues: number; conformations: number }] }>()
 const store = useProteinStore()
 const form = reactive({ residues: 10, conformations: 1000 })
