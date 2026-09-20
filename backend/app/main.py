@@ -1,11 +1,20 @@
 import math
 import random
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 app = FastAPI(title="Protein Folding Analyzer")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# 采样参数约束的唯一口径：取值范围、上限与字段说明都以此为准，
+# 前端 frontend/src/constants.ts 中的 PARAM_RULES 必须与此保持一致。
+PARAM_RULES = {
+    "residues":     {"label": "残基数",  "min": 3,   "max": 50},
+    "conformations": {"label": "构象数量", "min": 100, "max": 5000},
+}
 
 RAMACHANDRAN_REGIONS = [
     {"name": "alpha-helix", "phi": (-100, -30), "psi": (-80, -10)},
@@ -29,8 +38,33 @@ def lennard_jones_energy(phi: float, psi: float, sigma: float = 3.4, epsilon: fl
     return 4 * epsilon * (ratio ** 12 - ratio ** 6) + epsilon
 
 class SampleRequest(BaseModel):
-    residues: int = 10
-    conformations: int = 1000
+    # 不设默认值：缺失即视为不合法，由校验异常处理器给出明确提示
+    residues: int = Field(ge=PARAM_RULES["residues"]["min"], le=PARAM_RULES["residues"]["max"])
+    conformations: int = Field(ge=PARAM_RULES["conformations"]["min"], le=PARAM_RULES["conformations"]["max"])
+
+def _describe_validation_error(err: dict) -> str:
+    """把单条校验错误翻译成指明具体字段的中文提示"""
+    loc = [x for x in err.get("loc", []) if x != "body"]
+    field = loc[-1] if loc else None
+    rule = PARAM_RULES.get(field) if isinstance(field, str) else None
+    if rule is None:
+        return "请求体格式不正确：需要 JSON 对象，包含 residues 与 conformations 两个整数参数"
+    label = f"{rule['label']}（{field}）"
+    err_type = err.get("type", "")
+    if err_type == "missing":
+        return f"缺少必填参数：{label}"
+    if err_type in ("int_parsing", "int_from_float", "int_type"):
+        return f"参数不合法：{label} 必须为整数"
+    return f"参数越界：{label} 的取值范围为 {rule['min']}–{rule['max']}"
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    messages = []
+    for err in exc.errors():
+        msg = _describe_validation_error(err)
+        if msg not in messages:
+            messages.append(msg)
+    return JSONResponse(status_code=400, content={"detail": "；".join(messages)})
 
 class ConformationOut(BaseModel):
     id: int

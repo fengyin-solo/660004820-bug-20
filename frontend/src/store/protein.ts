@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import axios from 'axios'
+import { ElMessage } from 'element-plus'
 import type { Conformation, SamplingResult, ProteinParams } from '@/types'
 
 export const useProteinStore = defineStore('protein', () => {
@@ -16,6 +17,10 @@ export const useProteinStore = defineStore('protein', () => {
       result.value = data
       selectedConformation.value = null
       selectedCluster.value = 'all'
+    } catch (err) {
+      // 参数不合法时后端返回 400 与逐项提示，原样展示；已有结果保持不变
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : null
+      ElMessage.error(typeof detail === 'string' ? detail : '采样请求失败，请稍后重试')
     } finally { loading.value = false }
   }
 

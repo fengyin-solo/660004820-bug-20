@@ -2,10 +2,10 @@
   <div class="control-card">
     <el-form :model="form" inline>
       <el-form-item label="残基数">
-        <el-input-number v-model="form.residues" :min="3" :max="50" />
+        <el-input-number v-model="form.residues" :min="rules.residues.min" :max="rules.residues.max" />
       </el-form-item>
       <el-form-item label="构象数量">
-        <el-input-number v-model="form.conformations" :min="100" :max="5000" :step="100" />
+        <el-input-number v-model="form.conformations" :min="rules.conformations.min" :max="rules.conformations.max" :step="100" />
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="emitSample" :loading="store.loading">🎲 生成构象采样</el-button>
@@ -25,12 +25,22 @@
 
 <script setup lang="ts">
 import { reactive, ref } from "vue"
+import { ElMessage } from "element-plus"
 import { useProteinStore } from "../store/protein"
+import { PARAM_RULES, validateParams } from "../constants"
 const emit = defineEmits<{ sample: [params: { residues: number; conformations: number }] }>()
 const store = useProteinStore()
+const rules = PARAM_RULES
 const form = reactive({ residues: 10, conformations: 1000 })
 const activeCluster = ref("all")
-function emitSample() { emit("sample", { ...form }) }
+function emitSample() {
+  const errors = validateParams(form)
+  if (errors.length) {
+    ElMessage.error(errors.join("；"))
+    return
+  }
+  emit("sample", { ...form })
+}
 function onCluster(val: string) { store.filterByCluster(val) }
 </script>
 
